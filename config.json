@@ -1,0 +1,27 @@
+{
+    "network": {
+        "cdpPort": 9222,
+        "mqttBroker": "mqtt://192.168.3.100:1883",
+        "mqttTopic": "ulanzi_a728/custom/netease"
+    },
+    "display": {
+        "screenWidth": 52,
+        "screenHeight": 16,
+        "preset": "LARGE_CURRENT"
+    },
+    "colors": {
+        "progressBarTrack": "#222222",
+        "progressBarFill": "#00FFFF",
+        "statusPlayIcon": "#00FFCC",
+        "statusPauseIcon": "#FFCC00",
+        "currentTime": "#00FFCC",
+        "totalTime": "#888888",
+        "TagHeader": "#F20D24",
+        "vinylBody": "#2A2A2A",
+        "vinylCenter": "#F20D24",
+        "vinylSpindle": "#FFFFFF",
+        "tonearmBase": "#888888",
+        "tonearmPlay": "#00FFCC",
+        "tonearmPause": "#666666"
+    }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "netease-ulanzi-monitor",
+  "version": "1.0.0",
+  "description": "NetEase Cloud Music now playing monitor for Ulanzi Pixel Clock via CDP & MQTT",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "keywords": [
+    "netease",
+    "cloudmusic",
+    "cdp",
+    "mqtt",
+    "ulanzi",
+    "pixel-clock"
+  ],
+  "author": "FrankYu",
+  "license": "MIT",
+  "dependencies": {
+    "mqtt": "^5.10.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
