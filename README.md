@@ -36,9 +36,10 @@
 
 ```text
 netease-ulanzi-monitor/
-├── config.json          # 全局用户配置文件（网络、预设选择、配色方案）
+├── config.example.json  # 配置文件模板（提交至 Git，不包含个人敏感配置）
+├── config.json          # 实际生效的用户配置文件（包含本机配置，已被 .gitignore 忽略）
 ├── renderer.js          # Ulanzi 像素排版与图元构建渲染模块
-├── app.js               # CDP 监听、本地平滑时钟引擎与 MQTT 主入口
+├── app.js               # 进程守护、CDP 监听、本地平滑时钟引擎与 MQTT 主入口
 ├── run-silent.vbs       # Windows 后台静默自启脚本
 ├── package.json
 └── README.md
@@ -53,20 +54,26 @@ netease-ulanzi-monitor/
 
 ```bash
 git clone https://github.com/yqs9807/netMusic-progress-bar.git
-cd netease-ulanzi-monitor
+cd netMusic-progress-bar
 npm install
 ```
 
-### 2. 修改用户配置文件 `config.json`
+### 2. 生成并修改用户配置文件 `config.json`
 
-打开根目录下的 `config.json`，根据你的网络环境与显示喜好修改参数即可，无需修改任何代码：
+打开根目录下的 `config.example.json`，复制一份并重命名为 `config.json` ，根据你的网络环境与显示喜好修改参数即可，无需修改任何代码：
 
 > 注意：
-> - cdpPort：需要修改为与后续网易云音乐添加的调试参数端口，默认 9222，被占用时可修改为其他端口
-> - mqttBroker：根据自己的情况修改 MQTT Broker 地址和端口号
-> - mqttTopic: 根据设备的情况，DIY 应用的 Topic 为 {[topic_prefix]/custom/[DIYAPP_name]}
->   - 前缀：ulanzi_xxxx，其中 xxxx 为设备 MAC 地址后四位的小写，如设备MAC地址为 `CC:C4:B2:77:A1:23`，此处的前缀应该为 ulanzi_a123
->   - DIYAPP_name：设备会将此应用标记为 DIYAPP_name，不同的 DIYAPP_name 代表不同的应用，可以通过旋钮切换，此时默认为“netease”，用于可以自行修改。
+> 
+> 本项目无法直接开箱运行，运行前必须由模板复制生成 config.json 并修改您的设备专属参数（尤其是 mqttBroker 与 mqttTopic），否则脚本将无法与 MQTT Broker 建立连接，设备也将无法接收显示数据。
+
+
+> 关键参数配置指南
+> - mqttBroker（必改）：修改为您实际搭建的 MQTT 服务器 IP 与端口（例如软路由、NAS 或 Home Assistant 的 MQTT 实例，格式如 mqtt://192.168.1.1:1883）。
+>   - 如果设有账号密码，请按标准 URI 格式填写：mqtt://username:password@192.168.1.1:1883。
+> - mqttTopic（必改）：Ulanzi TC002 接收自定义绘图的格式标准为：[topic_prefix]/custom/[DIYAPP_name]。  
+>   - 前缀（topic_prefix）：默认规则为 ulanzi_xxxx，其中 xxxx 为您的 Ulanzi TC002 的 MAC 地址最后 4 位小写。例如屏设备 MAC 为 CC:C4:B2:77:A1:23，前缀则必须填为 ulanzi_a123。  
+>   - 应用名（DIYAPP_name）：设备会将此点阵标记为一个独立的自定义应用（可通过机身旋钮左右切换其他），默认设为 netease，如无特殊冲突建议保持默认。  
+>   - cdpPort：与后续网易云音乐添加的调试启动参数端口一致，默认为 9222。如已被系统其他应用占用可更改为其他端口（如 9223）。
 
 ```json
 {
@@ -76,9 +83,9 @@ npm install
     "mqttTopic": "{topic_prefix}/custom/netease"
   },
   "display": {
-    "screenWidth": 52,
-    "screenHeight": 16,
-    "preset": "RETRO_BADGE"
+    "screenWidth": 52,                      // 点阵屏幕长，不建议修改
+    "screenHeight": 16,                     // 点阵屏幕高，不建议修改
+    "preset": "RETRO_BADGE"                 // 三选一预设
   },
   "colors": {
     "progressBarTrack": "#222222",        // 进度条未播放颜色
@@ -111,14 +118,29 @@ npm install
 
 2. 右键网易云音乐桌面快捷方式 -> **属性** -> **快捷方式** 选项卡。
 
-3. 在 **目标**（Target）栏末尾添加调试参数（**注意前面有一个空格**）：
+3. 在 **目标**（Target）栏末尾添加调试参数（**注意前面有一个空格**）`：`
 
 ```text
---remote-debugging-port=9222
+ --remote-debugging-port=9222
 ```
 
 4. 点击确定，并重新启动网易云音乐。
 
+> ⚠️ 重要提示：网易云客户端更新后参数失效问题
+> 
+> 当网易云音乐在后台完成自动静默更新或版本升级后，Windows 的桌面/开始菜单快捷方式会被安装程序强制重新生成并覆盖，导致此前手动追加的 `--remote-debugging-port=9222` 参数丢失，进而造成控制端无法捕获播放状态。
+> 
+> - 应对与防重置方案：
+> 
+>   重新检查快捷方式：如果在客户端更新后屏幕不再显示播放进度，请重复上述步骤检查目标栏参数是否已被还原并重新填入。
+> 
+>   持久化启动方式（推荐）：不要直接修改网易云默认快捷方式，而是在项目根目录下创建一个专用的启动脚本 start-cloudmusic.bat，之后通过该批处理或其快捷方式启动网易云（请根据您的实际安装路径调整下面 cloudmusic.exe 的路径）：
+> 
+> ``` DOS
+> @echo off
+> start "" "C:\Program Files\NetEase\CloudMusic\cloudmusic.exe" --remote-debugging-port=9222
+> ```
+> 
 
 ### 4. 运行监控服务
 
@@ -191,6 +213,13 @@ ws.Run "node """ & currentPath & "\app.js""", 0, False
 
 ---
 
+## 当前存在问题
+
+1. 受设备固件限制，当前无法自动切换到 DIY 模式，需要手动切换。
+2. 网易云音乐更新后，快捷方式的设置会被重置，需要再次手动添加相关启动参数。
+
+---
+
 ## 开源许可
 
 本项目基于 [MIT License](https://www.google.com/search?q=LICENSE) 开源。
@@ -203,8 +232,3 @@ ws.Run "node """ & currentPath & "\app.js""", 0, False
 * **MQTT Version 5.0 / 3.1.1 Specification**: OASIS Standard for IoT Messaging Protocol
 * **Microsoft Learn**: Windows Script Host `WScript.Shell.Run` Method WindowStyle Reference
 
----
-
-## 当前存在问题
-
-受设备固件限制，当前无法自动切换到 DIY 模式，需要手动切换。
