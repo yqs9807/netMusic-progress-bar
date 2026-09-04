@@ -202,3 +202,9 @@ ws.Run "node """ & currentPath & "\app.js""", 0, False
 * **Chrome DevTools Protocol (CDP)**: `Runtime.evaluate` & `Emulation` Domain Specifications
 * **MQTT Version 5.0 / 3.1.1 Specification**: OASIS Standard for IoT Messaging Protocol
 * **Microsoft Learn**: Windows Script Host `WScript.Shell.Run` Method WindowStyle Reference
+
+---
+
+## 当前存在问题
+
+受设备固件限制，当前无法自动切换到 DIY 模式，需要手动切换。
