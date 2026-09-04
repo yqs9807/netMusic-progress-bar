@@ -1,7 +1,7 @@
 {
-  "name": "netease-ulanzi-monitor",
+  "name": "netMusic-progress-bar",
   "version": "1.0.0",
-  "description": "NetEase Cloud Music now playing monitor for Ulanzi Pixel Clock via CDP & MQTT",
+  "description": "使用 Ulanzi TC002 点阵屏显示网易云音乐播放进度。",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
