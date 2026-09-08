@@ -66,6 +66,59 @@ function appendProgressBar(drawList, currentSec, totalSec, screenWidth, screenHe
 }
 
 /**
+ * 计算围绕内圈外沿的对端双高光及前后渐变过渡点
+ * @param {number} currentSec - 当前秒数
+ * @param {Object} colors - 全局颜色配置
+ * @param {number} period - 旋转一圈所需的总秒数（默认 20 秒）
+ * @returns {Array} 旋转点图元数组
+ */
+function getVinylSpecularHighlights(currentSec, colors, period = 20) {
+  const centerX = 6;
+  const centerY = 7;
+  const radius = 3.0; // 紧贴半径为 2 的内芯外沿
+
+  // 基础顺时针弧度
+  const baseAngle = ((currentSec % period) / period) * 2 * Math.PI;
+  // 前后羽化过渡的角度偏移（约 22.5 度）
+  const offsetAngle = Math.PI / 8;
+
+  // 从配置中读取高光配色（带 Fallback 兜底）
+  const colorMain = colors.vinylHighlightMain || '#FFD700';
+  const colorFade = colors.vinylHighlightFade || '#554822';
+
+  const points = [];
+  const pointMap = new Map();
+
+  function addPoint(angle, color, priority) {
+    const x = Math.round(centerX + radius * Math.sin(angle));
+    const y = Math.round(centerY - radius * Math.cos(angle));
+    const key = `${x},${y}`;
+
+    // 像素点重叠时优先保留高优先级的主点
+    if (!pointMap.has(key) || pointMap.get(key).priority < priority) {
+      pointMap.set(key, { x, y, color, priority });
+    }
+  }
+
+  // 计算两侧对端高光：0（主端）与 Math.PI（对端）
+  [0, Math.PI].forEach((oppositeOffset) => {
+    const centerA = baseAngle + oppositeOffset;
+    // 前点（拖尾微光）
+    addPoint(centerA - offsetAngle, colorFade, 1);
+    // 后点（前导微光）
+    addPoint(centerA + offsetAngle, colorFade, 1);
+    // 中心主高光点
+    addPoint(centerA, colorMain, 2);
+  });
+
+  for (const p of pointMap.values()) {
+    points.push({ dp: [p.x, p.y, p.color] });
+  }
+
+  return points;
+}
+
+/**
  * 主排版渲染导出函数
  * @param {number} currentSec - 当前播放秒数
  * @param {number} totalSec - 歌曲总时长秒数
@@ -97,7 +150,7 @@ function buildPayload(currentSec, totalSec, isPlaying, config) {
           fontHeight: 5,
           x: 1,
           y: 1,
-          color: colors.compactTagHeader,
+          color: colors.TagHeader || '#F20D24',
           rect: [0, 0, display.screenWidth, display.screenHeight],
           charSpacing: 1
         },
@@ -158,14 +211,22 @@ function buildPayload(currentSec, totalSec, isPlaying, config) {
     case 'RETRO_BADGE': {
       appendStatusIcon(drawElements, 48, 1, isPlaying, colors);
 
-      // 1. 绘制圆形黑胶盘面 (圆心 x:6, y:7, 半径 r:5) 与中心红标
+      // 1. 绘制圆形黑胶底盘 (半径 5)
       drawElements.push(
-        { dfc: [6, 7, 5, colors.vinylBody] },
-        { dfc: [6, 7, 2, colors.vinylCenter] },
-        { dp: [6, 7, isPlaying ? colors.vinylSpindle : colors.vinylBody] }
+        { dfc: [6, 7, 5, colors.vinylBody] }
       );
 
-      // 2. 联动唱臂动作
+      // 2. 注入对端双高光点（播放时随时间旋转，暂停时自动在当前角度静止定格）
+      const highlights = getVinylSpecularHighlights(currentSec, colors, 20);
+      drawElements.push(...highlights);
+
+      // 3. 中心红标 (半径 2) 与中心轴孔
+      drawElements.push(
+        { dfc: [6, 7, 2, colors.vinylCenter] },
+        { dp: [6, 7, colors.vinylSpindle] }
+      );
+
+      // 4. 联动唱臂动作
       if (isPlaying) {
         // 播放中：唱臂斜向伸入黑胶盘面 (12,1) -> (9,4)
         drawElements.push(
@@ -180,12 +241,12 @@ function buildPayload(currentSec, totalSec, isPlaying, config) {
         );
       }
 
-      // 3. 绘制唱臂基座 (固定旋转轴: 12, 1)
+      // 5. 唱臂基座 (固定旋转轴: 12, 1)
       drawElements.push(
         { dp: [12, 1, colors.tonearmBase] }
       );
 
-      // 4. 右侧时间文本
+      // 6. 右侧时间文本
       textElements = [
         {
           content: currentStr,

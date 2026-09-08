@@ -12,14 +12,16 @@
   "colors": {
     "progressBarTrack": "#222222",
     "progressBarFill": "#00FFFF",
-    "statusPlayIcon": "#00FFCC",
+    "statusPlayIcon": "#FF4048",
     "statusPauseIcon": "#FFCC00",
     "currentTime": "#00FFCC",
     "totalTime": "#888888",
-    "compactTagHeader": "#F20D24",
+    "TagHeader": "#F20D24",
     "vinylBody": "#2A2A2A",
     "vinylCenter": "#F20D24",
     "vinylSpindle": "#FFFFFF",
+    "vinylHighlightMain": "#FFD700",
+    "vinylHighlightFade": "#554822",
     "tonearmBase": "#888888",
     "tonearmPlay": "#00FFCC",
     "tonearmPause": "#666666"

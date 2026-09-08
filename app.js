@@ -1,6 +1,6 @@
 /**
  * NetEase Cloud Music Now Playing Monitor
- * 主入口服务：集成网易云进程生命周期监听、退出清屏、CDP 及 MQTT
+ * 主入口服务：自校准高精度 1.0s 平滑发射器 + 进程生命周期守护 + CDP + MQTT
  */
 
 const fs = require('fs');
@@ -36,13 +36,13 @@ let anchorCurrent = 0;
 let anchorTotal = 0;
 let anchorTimestamp = 0;
 let isPlaying = false;
-let lastPublishedSecond = -1;
-let lastPublishedPlayState = null;
+let displayedSecond = 0;
 
 let isNeteaseRunning = false;
 let cdpWs = null;
 let cdpPollTimer = null;
-let smoothClockTimer = null;
+let tickerTimeout = null;
+let nextExpectedTick = 0;
 
 // ==========================================
 // MQTT 客户端
@@ -85,40 +85,67 @@ function publishClearScreen() {
 }
 
 // ==========================================
-// 平滑时钟引擎调度
+// 高精度自校准平滑时钟引擎 (1.000s 严格节拍)
 // ==========================================
+function scheduleNextTick() {
+  if (!isNeteaseRunning) return;
+
+  const now = Date.now();
+  // 计算下一次 1 秒触发所需的实际补偿时间，消除事件循环漂移
+  let delay = nextExpectedTick - now;
+  if (delay < 0) delay = 0;
+
+  tickerTimeout = setTimeout(() => {
+    tickClock();
+  }, delay);
+}
+
+function tickClock() {
+  if (!isNeteaseRunning) return;
+
+  // 1. 根据播放状态自然步进
+  if (isPlaying) {
+    if (displayedSecond < anchorTotal) {
+      displayedSecond += 1;
+    }
+    // 软对齐：若累积误差与物理推测差距大于 1.5 秒，进行无感平滑纠偏
+    if (anchorTimestamp > 0) {
+      const realPredicted = anchorCurrent + (Date.now() - anchorTimestamp) / 1000;
+      if (Math.abs(realPredicted - displayedSecond) > 1.5) {
+        displayedSecond = Math.floor(realPredicted);
+      }
+    }
+  }
+
+  // 2. 发射固定 1 秒间隔数据
+  publishCurrentState(displayedSecond);
+
+  // 3. 规划下一次标准节拍点
+  nextExpectedTick += 1000;
+  scheduleNextTick();
+}
+
 function startSmoothClock() {
-  if (smoothClockTimer) return;
+  if (tickerTimeout) return;
 
-  smoothClockTimer = setInterval(() => {
-    if (!isNeteaseRunning || anchorTotal <= 0 || anchorTimestamp === 0) return;
+  displayedSecond = Math.floor(anchorCurrent);
+  nextExpectedTick = Date.now() + 1000;
 
-    let estimatedCurrent = anchorCurrent;
-    if (isPlaying) {
-      const elapsed = (Date.now() - anchorTimestamp) / 1000;
-      estimatedCurrent = Math.min(anchorCurrent + elapsed, anchorTotal);
-    }
-    const currentSecFloor = Math.floor(estimatedCurrent);
-
-    if (currentSecFloor !== lastPublishedSecond || isPlaying !== lastPublishedPlayState) {
-      lastPublishedSecond = currentSecFloor;
-      lastPublishedPlayState = isPlaying;
-      publishCurrentState(currentSecFloor);
-    }
-  }, 200);
+  // 启动即立刻推送一次当前基准状态
+  publishCurrentState(displayedSecond);
+  scheduleNextTick();
 }
 
 function stopSmoothClock() {
-  if (smoothClockTimer) {
-    clearInterval(smoothClockTimer);
-    smoothClockTimer = null;
+  if (tickerTimeout) {
+    clearTimeout(tickerTimeout);
+    tickerTimeout = null;
   }
-  lastPublishedSecond = -1;
-  lastPublishedPlayState = null;
   anchorCurrent = 0;
   anchorTotal = 0;
   anchorTimestamp = 0;
   isPlaying = false;
+  displayedSecond = 0;
 }
 
 // ==========================================
@@ -170,7 +197,6 @@ async function connectCDP() {
 
     cdpWs.on('open', () => {
       console.log('[CDP] 调试端点连接建立，开始捕获状态...');
-      startSmoothClock();
 
       cdpPollTimer = setInterval(() => {
         if (!cdpWs || cdpWs.readyState !== WebSocket.OPEN) return;
@@ -206,7 +232,7 @@ async function connectCDP() {
           method: 'Runtime.evaluate',
           params: { expression, returnByValue: true }
         }));
-      }, 200);
+      }, 300);
     });
 
     cdpWs.on('message', (message) => {
@@ -223,23 +249,29 @@ async function connectCDP() {
             isPlaying = data.btnState;
           }
 
-          if (previousState && !isPlaying) {
-            const currentPredicted = anchorCurrent + (Date.now() - anchorTimestamp) / 1000;
-            anchorCurrent = Math.min(Math.max(currentPredicted, rawCurrent), anchorTotal);
-            anchorTimestamp = Date.now();
-            lastPublishedPlayState = null;
-          } else if (!previousState && isPlaying) {
+          // 首次加载或手动切换歌曲时启动时钟
+          if (!tickerTimeout) {
             anchorCurrent = rawCurrent;
             anchorTimestamp = Date.now();
-            lastPublishedPlayState = null;
-          } else if (isPlaying) {
-            const currentPredicted = anchorCurrent + (Date.now() - anchorTimestamp) / 1000;
-            const diff = rawCurrent - currentPredicted;
+            startSmoothClock();
+            return;
+          }
 
-            if (Math.abs(diff) > 2.0 || anchorTimestamp === 0) {
-              anchorCurrent = rawCurrent;
-              anchorTimestamp = Date.now();
-            }
+          // 状态突变处理 (暂停 <-> 播放)
+          if (previousState !== isPlaying) {
+            anchorCurrent = rawCurrent;
+            anchorTimestamp = Date.now();
+            // 状态改变瞬间立即推送一次，保证图标响应零延迟
+            publishCurrentState(displayedSecond);
+            return;
+          }
+
+          // 用户在播放条上进行了大跨度拖拽 Seek (偏差大于 2.5 秒)
+          if (Math.abs(rawCurrent - displayedSecond) > 2.5) {
+            anchorCurrent = rawCurrent;
+            anchorTimestamp = Date.now();
+            displayedSecond = Math.floor(rawCurrent);
+            publishCurrentState(displayedSecond);
           }
         }
       } catch (e) {}
