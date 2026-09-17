@@ -7,7 +7,7 @@
 
 基于 **Chrome DevTools Protocol (CDP)** 与 **MQTT** 构建的轻量级桌面硬件联动工具。
 
-通过 CDP 协议毫秒级捕获 Windows 客户端网易云音乐（Electron 内核）的播放状态与时间进度，结合 **Dead Reckoning（航位推测/本地时钟平滑）** 算法消除节流卡顿，以原生图元指令推送到 MQTT Broker，供 **Ulanzi 像素时钟（TC002，52×16 点阵）** 实时呈现。
+通过 CDP 协议毫秒级捕获 Windows 客户端网易云音乐（Electron 内核）的播放状态与时间进度，结合 **Dead Reckoning（航位推测/本地时钟平滑）** 算法消除节流卡顿，以原生指令 `draw/text` 推送到 MQTT Broker，供 **Ulanzi 像素时钟（TC002，52×16 点阵）** 实时呈现。
 
 ---
 
@@ -15,8 +15,8 @@
 
 * **零侵入与零外部依赖**：纯原生 Node.js 实现，无需安装 `puppeteer`、BetterNCM 插件，无需 Patch 客户端内核文件。
 * **本地平滑推进 (Dead Reckoning)**：针对 Electron 渲染层节流（DOM 2 秒跳跃一次）问题，通过本地高精度时钟均匀推进，彻底杜绝跳秒。
-* **精准状态即时响应**：针对网易云 DOM 结构直接匹配播放状态，即使捕获暂停/播放动作进行同步推送。
-* **三种精美排版预设**：内置紧凑标签、大号主时钟以及带有机械唱臂联动的黑胶唱片模式。
+* **精准状态即时响应**：针对网易云 DOM 结构直接匹配播放状态，及时捕获暂停/播放动作进行同步推送。
+* **三种不同排版预设**：内置紧凑标签、大号主时钟以及带有机械唱臂联动的黑胶唱片模式。
 * **模块化解耦架构**：配置参数抽离为独立 `config.json`，绘图排版抽象为独立 `renderer.js`，修改配色与微调布局完全无需修改服务主程序。
 * **极低系统资源占用**：单连接 WebSocket 本地回环通信，CPU 占用接近 0%，内存常驻占用约 30MB。
 
@@ -36,11 +36,12 @@
 
 ```text
 netease-ulanzi-monitor/
-├── config.example.json  # 配置文件模板（提交至 Git，不包含个人敏感配置）
-├── config.json          # 实际生效的用户配置文件（包含本机配置，已被 .gitignore 忽略）
+├── config.example.json  # 配置文件模板
+├── config.json          # 实际生效的用户配置文件（用户下载后使用 config.example.json 自行创建）
 ├── renderer.js          # Ulanzi 像素排版与图元构建渲染模块
 ├── app.js               # 进程守护、CDP 监听、本地平滑时钟引擎与 MQTT 主入口
 ├── run-silent.vbs       # Windows 后台静默自启脚本
+├── check-colors.js      # 检查各种组件的颜色在不同亮度的显示情况，过暗的颜色可能会在低亮度上无法显示
 ├── package.json
 └── README.md
 
@@ -245,6 +246,7 @@ ws.Run "node """ & currentPath & "\app.js""", 0, False
 
 1. 受设备固件限制，当前无法自动切换到 DIY 模式，需要手动切换。
 2. 网易云音乐更新后，快捷方式的设置会被重置，需要再次手动添加相关启动参数。
+3. 因为 Node 启动的时候就已经加载了 `config.js`，所以修改了配置文件后，需要 kill 掉之前的进程后，重新启动。
 
 ---
 
