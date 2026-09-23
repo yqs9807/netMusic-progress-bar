@@ -2,9 +2,20 @@
   "name": "netMusic-progress-bar",
   "version": "1.0.0",
   "description": "使用 Ulanzi TC002 点阵屏显示网易云音乐播放进度。",
-  "main": "app.js",
+  "main": "index.js",
+  "bin": "index.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node index.js",
+    "check-colors": "node scripts/check-colors.js",
+    "build:exe": "pkg . --targets node22-win-x64 --output dist/PixMusicControl.exe && node scripts/patch-gui.js"
+  },
+  "pkg": {
+    "assets": [
+      "web/**/*",
+      "assets/**/*",
+      "config/config.example.json",
+      "node_modules/systray2/traybin/**/*"
+    ]
   },
   "keywords": [
     "netease",
@@ -18,9 +29,13 @@
   "license": "MIT",
   "dependencies": {
     "mqtt": "^5.10.0",
+    "systray2": "^2.1.3",
     "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0"
   }
 }

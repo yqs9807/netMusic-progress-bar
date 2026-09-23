@@ -1,6 +1,9 @@
 # 忽略包含敏感信息的本地实际配置文件
+.gitignore
 config.json
+todo-list.md
 
 # 忽略依赖与环境
 node_modules/
+dist/
 *.log

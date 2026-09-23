@@ -9,10 +9,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const configPath = path.resolve(__dirname, 'config.json');
+// 此时脚本在 scripts 目录下，上一级即为项目根目录
+const configPath = path.resolve(__dirname, '..', 'config', 'config.json');
 
 if (!fs.existsSync(configPath)) {
-  console.error('[错误] 未找到 config.json，请先从 config.example.json 复制创建配置文件！');
+  console.error('[错误] 未找到 config.json，请先运行或从 config.example.json 复制创建配置文件！');
   process.exit(1);
 }
 
@@ -24,12 +25,34 @@ try {
   process.exit(1);
 }
 
-const colors = config.colors || {};
+// 将嵌套的颜色对象拍平为一维键值对，例如 "common.progressBarTrack" : "#222222"
+function extractAllColors(colorsObj) {
+  const result = {};
+  if (!colorsObj) return result;
+
+  // 提取通用颜色
+  if (colorsObj.common) {
+    for (const [k, v] of Object.entries(colorsObj.common)) {
+      result[`common.${k}`] = v;
+    }
+  }
+
+  // 提取各个预设模式下的专属颜色
+  if (colorsObj.presets) {
+    for (const [presetName, presetColors] of Object.entries(colorsObj.presets)) {
+      for (const [k, v] of Object.entries(presetColors)) {
+        result[`${presetName}.${k}`] = v;
+      }
+    }
+  }
+
+  return result;
+}
+
+const flatColors = extractAllColors(config.colors);
 
 /**
  * 计算 Hex 颜色在屏幕上不熄灭所需的最低亮度百分比
- * @param {string} hex - 6位十六进制颜色值 (如 "#2A2A2A")
- * @returns {{ minBrightness: number, maxChannel: number, isBlack: boolean }}
  */
 function calculateMinBrightness(hex) {
   const cleanHex = hex.replace('#', '');
@@ -43,39 +66,38 @@ function calculateMinBrightness(hex) {
     return { minBrightness: 0, maxChannel: 0, isBlack: true };
   }
 
-  // 核心公式: 100 / max(R, G, B) 向上取整
   const minBrightness = Math.ceil(100 / maxChannel);
   return { minBrightness, maxChannel, isBlack: false };
 }
 
-console.log('===========================================================');
-console.log('       Ulanzi TC002 颜色最低可见亮度检测结果                ');
-console.log('       (设备硬件有效调节范围: 5% ~ 100%)                   ');
-console.log('===========================================================');
-console.log('配置项名称            HEX颜色     通道最大值   最低可见亮度   状态');
-console.log('-----------------------------------------------------------');
+console.log('========================================================================');
+console.log('            Ulanzi TC002 颜色最低可见亮度检测结果                         ');
+console.log('            (设备硬件有效调节范围: 5% ~ 100%)                            ');
+console.log('========================================================================');
+console.log('配置项名称                                 HEX颜色     通道最大值   最低可见亮度   状态');
+console.log('------------------------------------------------------------------------');
 
 let highestMinBrightness = 5;
 let failColors = [];
 
-for (const [key, hexValue] of Object.entries(colors)) {
+for (const [key, hexValue] of Object.entries(flatColors)) {
   if (typeof hexValue !== 'string' || !hexValue.startsWith('#')) continue;
 
   const result = calculateMinBrightness(hexValue);
-  const keyPadded = key.padEnd(20, ' ');
+  // 加长 key 的占位以适配嵌套后的长属性名
+  const keyPadded = key.padEnd(40, ' ');
   const hexPadded = hexValue.padEnd(10, ' ');
   const channelPadded = String(result.maxChannel).padEnd(10, ' ');
 
   if (result.isBlack) {
-    console.log(`${keyPadded}  ${hexPadded}  ${channelPadded}   --            纯黑(不发光)`);
+    console.log(`${keyPadded} ${hexPadded} ${channelPadded}  --            纯黑(不发光)`);
     continue;
   }
 
-  // 判断是否会在最低 5% 亮度下熄灭
   const isCompatibleAtLowest = result.minBrightness <= 5;
   const statusStr = isCompatibleAtLowest ? '安全 (全亮度可见)' : `需 >= ${result.minBrightness}%`;
 
-  console.log(`${keyPadded}  ${hexPadded}  ${channelPadded}   ${String(result.minBrightness).padStart(3, ' ')}%         ${statusStr}`);
+  console.log(`${keyPadded} ${hexPadded} ${channelPadded}  ${String(result.minBrightness).padStart(3, ' ')}%         ${statusStr}`);
 
   if (result.minBrightness > highestMinBrightness) {
     highestMinBrightness = result.minBrightness;
@@ -86,7 +108,7 @@ for (const [key, hexValue] of Object.entries(colors)) {
   }
 }
 
-console.log('-----------------------------------------------------------');
+console.log('------------------------------------------------------------------------');
 
 if (failColors.length > 0) {
   console.log(`[检测结论] 当前配置无法在设备的极端最低亮度 (5%) 下全量显示！`);
@@ -99,4 +121,4 @@ if (failColors.length > 0) {
 } else {
   console.log(`[检测结论] 完美兼容！所有颜色在设备允许调节的最低亮度 (5%) 下均可正常发光点亮。`);
 }
-console.log('===========================================================');
+console.log('========================================================================');

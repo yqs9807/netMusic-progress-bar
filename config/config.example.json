@@ -1,0 +1,40 @@
+{
+  "network": {
+    "cdpPort": 9222,
+    "mqttBroker": "mqtt://IP:PORT",
+    "mqttTopic": "ulanzi_xxxx/custom/netease",
+    "webPort": 25688,
+    "deviceIP": "192.168.3.45"
+  },
+  "display": {
+    "screenWidth": 52,
+    "screenHeight": 16,
+    "preset": "RETRO_BADGE"
+  },
+  "colors": {
+    "common": {
+      "progressBarTrack": "#222222",
+      "progressBarFill": "#00FFFF",
+      "currentTime": "#00FFCC",
+      "totalTime": "#888888",
+      "statusPlayIcon": "#FF4048",
+      "statusPauseIcon": "#FFCC00"
+    },
+    "presets": {
+      "RETRO_BADGE": {
+        "vinylBody": "#2A2A2A",
+        "vinylCenter": "#F20D24",
+        "vinylSpindle": "#FFFFFF",
+        "vinylHighlightMain": "#FFD700",
+        "vinylHighlightFade": "#554822",
+        "tonearmBase": "#888888",
+        "tonearmPlay": "#00FFCC",
+        "tonearmPause": "#666666"
+      },
+      "COMPACT_TAG": {
+        "tagHeader": "#F20D24"
+      },
+      "LARGE_CURRENT": {}
+    }
+  }
+}

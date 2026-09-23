@@ -119,38 +119,38 @@ function getVinylSpecularHighlights(currentSec, colors, period = 20) {
 }
 
 /**
- * 主排版渲染导出函数
- * @param {number} currentSec - 当前播放秒数
- * @param {number} totalSec - 歌曲总时长秒数
- * @param {boolean} isPlaying - 是否处于播放中
- * @param {Object} config - 外部导入的完整配置对象
- * @returns {Object} 符合 Ulanzi 协议规范的 Payload
+ * 辅助：安全提取颜色，兼顾新版嵌套结构与旧版扁平结构
  */
+function resolveColors(rawColors, preset) {
+  const common = rawColors.common || rawColors;
+  const presetColors = (rawColors.presets && rawColors.presets[preset]) || rawColors;
+  return { ...common, ...presetColors };
+}
+
 function buildPayload(currentSec, totalSec, isPlaying, config) {
-  const { display, colors } = config;
+  const { display } = config;
+  // 聚合得到当前预设生效的色彩字典
+  const colors = resolveColors(config.colors, display.preset);
+  
   const currentStr = formatSec(currentSec);
   const totalStr = formatSec(totalSec);
 
   const drawElements = [];
   let textElements = [];
 
-  // 统一绘制基础底栏进度条
+  // 底栏进度条
   appendProgressBar(drawElements, currentSec, totalSec, display.screenWidth, display.screenHeight, colors);
 
   switch (display.preset) {
-    // ----------------------------------------------------
-    // 预设模式一: COMPACT_TAG (紧凑双行标签模式)
-    // ----------------------------------------------------
     case 'COMPACT_TAG': {
       appendStatusIcon(drawElements, 48, 1, isPlaying, colors);
-
       textElements = [
         {
           content: 'Net Music',
           fontHeight: 5,
           x: 1,
           y: 1,
-          color: colors.TagHeader || '#F20D24',
+          color: colors.tagHeader || colors.TagHeader || '#F20D24',
           rect: [0, 0, display.screenWidth, display.screenHeight],
           charSpacing: 1
         },
@@ -176,12 +176,8 @@ function buildPayload(currentSec, totalSec, isPlaying, config) {
       break;
     }
 
-    // ----------------------------------------------------
-    // 预设模式二: LARGE_CURRENT (大字体重点显示当前进度)
-    // ----------------------------------------------------
     case 'LARGE_CURRENT': {
       appendStatusIcon(drawElements, 48, 1, isPlaying, colors);
-
       textElements = [
         {
           content: currentStr,
@@ -205,48 +201,38 @@ function buildPayload(currentSec, totalSec, isPlaying, config) {
       break;
     }
 
-    // ----------------------------------------------------
-    // 预设模式三: RETRO_BADGE (黑胶唱片与机械唱臂联动模式)
-    // ----------------------------------------------------
     case 'RETRO_BADGE': {
       appendStatusIcon(drawElements, 48, 1, isPlaying, colors);
 
-      // 1. 绘制圆形黑胶底盘 (半径 5)
-      drawElements.push(
-        { dfc: [6, 7, 5, colors.vinylBody] }
-      );
+      // 黑胶盘面
+      drawElements.push({ dfc: [6, 7, 5, colors.vinylBody] });
 
-      // 2. 注入对端双高光点（播放时随时间旋转，暂停时自动在当前角度静止定格）
+      // 旋转双高光
       const highlights = getVinylSpecularHighlights(currentSec, colors, 20);
       drawElements.push(...highlights);
 
-      // 3. 中心红标 (半径 2) 与中心轴孔
+      // 唱片中心
       drawElements.push(
         { dfc: [6, 7, 2, colors.vinylCenter] },
-        { dp: [6, 7, colors.vinylSpindle] }
+        { dp: [6, 7, isPlaying ? colors.vinylSpindle : colors.vinylBody] }
       );
 
-      // 4. 联动唱臂动作
+      // 唱臂动作
       if (isPlaying) {
-        // 播放中：唱臂斜向伸入黑胶盘面 (12,1) -> (9,4)
         drawElements.push(
           { dl: [12, 1, 9, 4, colors.tonearmPlay] },
           { dp: [9, 4, colors.vinylSpindle] }
         );
       } else {
-        // 暂停：唱臂垂直停靠归位至 (12,1) -> (12,4)
         drawElements.push(
           { dl: [12, 1, 12, 4, colors.tonearmPause] },
           { dp: [12, 4, colors.tonearmBase] }
         );
       }
 
-      // 5. 唱臂基座 (固定旋转轴: 12, 1)
-      drawElements.push(
-        { dp: [12, 1, colors.tonearmBase] }
-      );
+      drawElements.push({ dp: [12, 1, colors.tonearmBase] });
 
-      // 6. 右侧时间文本
+      // 时间文字
       textElements = [
         {
           content: currentStr,
@@ -271,10 +257,7 @@ function buildPayload(currentSec, totalSec, isPlaying, config) {
     }
   }
 
-  return {
-    text: textElements,
-    draw: drawElements
-  };
+  return { text: textElements, draw: drawElements };
 }
 
 module.exports = {

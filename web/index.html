@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pixmusiccontrol</title>
+  <link rel="icon" href="icons/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="container">
+    <!-- 顶部状态栏：集成保存与状态指示 -->
+    <header class="header">
+      <div class="logo">
+        <span class="dot"></span>
+        <div class="brand-group">
+          <h2>pixmusiccontrol</h2>
+          <span class="brand-sub">网易云音乐桌面像素控制台</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="status-badge" id="serviceStatus">已就绪</div>
+        <button id="saveBtn" class="btn btn-primary">
+          <img src="icons/save.svg" class="icon-inline" alt="">保存配置
+        </button>
+      </div>
+    </header>
+
+
+    <!-- 硬件展台区域 -->
+    <section class="hardware-stage">
+      <div class="device-container">
+        <div class="top-knob-orange"></div>
+        <div class="top-bar-black"></div>
+
+        <div class="device-body">
+          <div class="left-red-button"></div>
+          <div class="screen-frame">
+            <canvas id="matrixCanvas" width="624" height="192"></canvas>
+            <div class="screen-glare"></div>
+          </div>
+          <div class="bezel-footer">
+            <span class="brand-left">U-Clock <strong>TC002</strong></span>
+            <span class="brand-right">Pixbar</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- 底部双栏控制面板 -->
+    <div class="dashboard-grid">
+
+      <!-- 左栏：预设与集成通信管理 -->
+      <div class="col-left">
+        <!-- 模块一：预设与显示模式（改为横向排列） -->
+        <div class="card">
+          <div class="card-header">
+            <h3><img src="icons/radio.svg" class="icon-title" alt="">预设与显示模式</h3>
+            <div class="switch-wrapper">
+              <span class="switch-label" id="playStateLabel">播放状态</span>
+              <div id="switchTipWrapper" style="display: inline-flex; align-items: center;">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="playStateToggle" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 横向网格布局：一排三个，空间不足时自动折行 -->
+          <div class="preset-grid-row">
+            <label class="radio-preset-item">
+              <input type="radio" name="displayPreset" value="RETRO_BADGE" checked>
+              <div class="preset-content">
+                <div class="preset-name">RETRO_BADGE</div>
+                <div class="preset-desc">黑胶唱片联动机械唱臂</div>
+              </div>
+            </label>
+            <label class="radio-preset-item">
+              <input type="radio" name="displayPreset" value="COMPACT_TAG">
+              <div class="preset-content">
+                <div class="preset-name">COMPACT_TAG</div>
+                <div class="preset-desc">紧凑双行网易云标签</div>
+              </div>
+            </label>
+            <label class="radio-preset-item">
+              <input type="radio" name="displayPreset" value="LARGE_CURRENT">
+              <div class="preset-content">
+                <div class="preset-name">LARGE_CURRENT</div>
+                <div class="preset-desc">大号时间重点显示</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 模块二：设备与通信配置（三行内聚整合） -->
+        <div class="card">
+          <h3><img src="icons/network.svg" class="icon-title" alt="">设备与通信配置</h3>
+
+          <!-- 第一行：设备 IP 与连接按钮、状态 -->
+          <div class="form-group">
+            <div class="label-wrap">
+              <label for="deviceIp">设备局域网 IP 与连接状态</label>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="deviceIp" placeholder="例如: 192.168.3.45" style="flex: 1;">
+              <button id="connectDeviceBtn" class="btn btn-secondary">连接设备</button>
+              <div id="devMqttStatus" class="status-badge"
+                style="padding: 5px 12px; font-size: 11px; background: #262a38; color: #8b92a4; border: 1px solid var(--border-color); white-space: nowrap;">
+                未连接</div>
+            </div>
+            <span class="field-error" id="err-deviceIp"></span>
+          </div>
+
+          <!-- 第二行：设备控制区 (调整为 1:2 两栏布局) -->
+          <div id="deviceControlPanel"
+            style="display: none; margin-bottom: 12px; padding: 12px; background: #0e1017; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div class="device-control-grid">
+              <!-- 左侧：MAC 与一键填 Topic (占 1 份) -->
+              <div class="device-col-left"
+                style="display: flex; flex-direction: column; justify-content: center; gap: 8px; border-right: 1px solid var(--border-color); padding-right: 12px;">
+                <div style="font-size: 11px; color: var(--text-muted);">
+                  MAC: <strong id="devMac" style="color:#fff;">--</strong>
+                </div>
+                <button id="genTopicBtn" class="btn btn-secondary"
+                  style="padding: 3px 6px; font-size: 11px; width: 100%; justify-content: center;">一键填 Topic</button>
+              </div>
+
+              <!-- 右侧：屏幕亮度与滑块 (占 2 份) -->
+              <div class="device-col-right" style="padding-left: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span style="font-size: 11px; color: var(--text-muted);">屏幕亮度</span>
+                  <span id="devBrightnessValStr" style="color: #00FFCC; font-weight: 600; font-size: 11px;">50%</span>
+                </div>
+                <input type="range" id="devBrightness" min="5" max="100" value="50"
+                  style="width: 100%; cursor: pointer; display: block;">
+              </div>
+            </div>
+          </div>
+
+          <!-- 第三行：本地网络服务端口 (两列平分) -->
+          <div class="form-row">
+            <div class="form-group">
+              <div class="label-wrap">
+                <label for="webPort">Web 服务端口</label>
+                <span class="tooltip-trigger" data-tip="本地 Web 控制面板的访问端口，范围 1024-65535。">
+                  <img src="icons/help.svg" class="icon-tip" alt="?">
+                </span>
+              </div>
+              <input type="number" id="webPort" min="1024" max="65535" placeholder="25688">
+              <span class="field-error" id="err-webPort"></span>
+            </div>
+
+            <div class="form-group">
+              <div class="label-wrap">
+                <label for="cdpPort">CDP 调试端口</label>
+                <span class="tooltip-trigger" data-tip="网易云远程调试端口，范围 1024-65535。">
+                  <img src="icons/help.svg" class="icon-tip" alt="?">
+                </span>
+              </div>
+              <input type="number" id="cdpPort" min="1024" max="65535" placeholder="9222">
+              <span class="field-error" id="err-cdpPort"></span>
+            </div>
+          </div>
+
+          <!-- 第四行：MQTT 设备通信配置 (两列平分) -->
+          <div class="section-subtitle">MQTT 设备通信</div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="label-wrap">
+                <label for="mqttBroker">MQTT Broker 地址</label>
+                <span class="tooltip-trigger" data-tip="MQTT 服务端连接地址，如 mqtt://192.168.3.100:1883。">
+                  <img src="icons/help.svg" class="icon-tip" alt="?">
+                </span>
+              </div>
+              <input type="text" id="mqttBroker" placeholder="mqtt://192.168.3.100:1883">
+              <span class="field-error" id="err-mqttBroker"></span>
+            </div>
+
+            <div class="form-group">
+              <div class="label-wrap">
+                <label for="mqttTopic">MQTT 发布主题</label>
+                <span class="tooltip-trigger" data-tip="Ulanzi 设备接收点阵数据的 Topic。">
+                  <img src="icons/help.svg" class="icon-tip" alt="?">
+                </span>
+              </div>
+              <input type="text" id="mqttTopic" placeholder="ulanzi_a728/custom/netease">
+              <span class="field-error" id="err-mqttTopic"></span>
+            </div>
+          </div>
+          <!-- 下发按钮保留在卡片底部，点击可将上方 MQTT 配置推送到硬件 -->
+          <button id="pushMqttToDeviceBtn" class="btn btn-primary"
+            style="width: 100%; justify-content: center; margin-top: 15px;">
+            <img src="icons/network.svg" class="icon-inline" alt="" onerror="this.style.display='none'">一键下发 MQTT 配置至设备
+          </button>
+        </div>
+      </div>
+
+      <!-- 右栏：纯视觉与配色区 -->
+      <div class="col-right">
+        <div class="card">
+          <h3><img src="icons/palette.svg" class="icon-title" alt="">通用全局配色</h3>
+          <div class="color-grid" id="commonColorControls"></div>
+        </div>
+
+        <div class="card">
+          <h3 id="presetColorTitle"><img src="icons/palette.svg" class="icon-title" alt="">当前模式专属配色</h3>
+          <div class="color-grid" id="presetColorControls"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全局网页页脚 -->
+    <footer class="page-footer">
+      <div class="footer-inner">
+        <span>FrankYu © 2026</span>
+        <span class="footer-divider">·</span>
+        <a href="https://github.com/yqs9807/netMusic-progress-bar" target="_blank" rel="noopener noreferrer"
+          class="footer-link">GitHub</a>
+        <span class="footer-divider">·</span>
+        <a href="https://space.bilibili.com/14203921" target="_blank" rel="noopener noreferrer"
+          class="footer-link">哔哩哔哩</a>
+      </div>
+    </footer>
+  </div>
+
+
+  <!-- 全局顶部悬浮 Toast -->
+  <div id="toast" class="toast">配置已同步！</div>
+
+<script src="font.js"></script>
+  <script src="checkColor.js"></script>
+  <script src="appSwitcher.js"></script>
+  <script src="app.js"></script>
+  <script src="device.js"></script>
+</body>
+</html>
